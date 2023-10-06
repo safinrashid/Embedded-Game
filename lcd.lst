@@ -1,0 +1,205 @@
+
+
+
+ARM Macro Assembler    Page 1 
+
+
+    1 00000000 400043FC 
+                       GPIO_PORTA_DATA_R
+                               EQU              0x400043FC
+    2 00000000 40008008 
+                       SSI0_DR_R
+                               EQU              0x40008008
+    3 00000000 4000800C 
+                       SSI0_SR_R
+                               EQU              0x4000800C
+    4 00000000         
+    5 00000000                 EXPORT           writecommand
+    6 00000000                 EXPORT           writedata
+    7 00000000         
+    8 00000000                 AREA             |.text|, CODE, READONLY, ALIGN=
+2
+    9 00000000                 THUMB
+   10 00000000                 ALIGN
+   11 00000000         
+   12 00000000         writecommand
+   13 00000000         ;; --UUU-- Code to write a command to the LCD
+   14 00000000         ;1) Read SSI0_SR_R and check bit 4, 
+   15 00000000         ;2) If bit 4 is high, loop back to step 1 (wait for BUSY
+                        bit to be low)
+   16 00000000         ;3) Clear D/C=PA6 to zero
+   17 00000000         ;4) Write the command to SSI0_DR_R
+   18 00000000         ;5) Read SSI0_SR_R and check bit 4, 
+   19 00000000         ;6) If bit 4 is high, loop back to step 5 (wait for BUSY
+                        bit to be low)
+   20 00000000         
+   21 00000000         CommandHigh1
+   22 00000000 4913            LDR              R1, =SSI0_SR_R ;read SR
+   23 00000002 6809            LDR              R1, [R1]
+   24 00000004 F001 0110       AND              R1, R1, #0x10
+   25 00000008 EA4F 1111       LSR              R1, R1, #4  ;isolate bit 4
+   26 0000000C 2901            CMP              R1, #1      ;check bit 4
+   27 0000000E D0F7            BEQ              CommandHigh1 ;wait for 0
+   28 00000010         
+   29 00000010 4910            LDR              R1, =GPIO_PORTA_DATA_R
+   30 00000012 680A            LDR              R2, [R1]
+   31 00000014 F022 0240       BIC              R2, #0x40   ;clear DC pa6
+   32 00000018 600A            STR              R2, [R1]
+   33 0000001A         
+   34 0000001A 490F            LDR              R1, =SSI0_DR_R
+   35 0000001C 6008            STR              R0, [R1]    ;write command
+   36 0000001E         
+   37 0000001E         CommandHigh2
+   38 0000001E 490C            LDR              R1, =SSI0_SR_R ;read SR
+   39 00000020 6809            LDR              R1, [R1]
+   40 00000022 F001 0110       AND              R1, R1, #0x10
+   41 00000026 EA4F 1111       LSR              R1, R1, #4  ;isolate bit 4
+   42 0000002A 2901            CMP              R1, #1      ;check bit 4
+   43 0000002C D0F7            BEQ              CommandHigh2 ;wait for 0
+   44 0000002E         
+   45 0000002E 4770            BX               LR          ;   return
+   46 00000030         
+   47 00000030         
+   48 00000030         ; This is a helper function that sends an 8-bit data to 
+                       the LCD.
+   49 00000030         ; Input: R0  8-bit data to transmit
+
+
+
+ARM Macro Assembler    Page 2 
+
+
+   50 00000030         ; Output: none
+   51 00000030         ; Assumes: SSI0 and port A have already been initialized
+                        and enabled
+   52 00000030         writedata
+   53 00000030         ;; --UUU-- Code to write data to the LCD
+   54 00000030         ;1) Read SSI0_SR_R and check bit 1, 
+   55 00000030         ;2) If bit 1 is low loop back to step 1 (wait for TNF bi
+                       t to be high)
+   56 00000030         ;3) Set D/C=PA6 to one
+   57 00000030         ;4) Write the 8-bit data to SSI0_DR_R
+   58 00000030         
+   59 00000030         FIFOLow
+   60 00000030 4907            LDR              R1, =SSI0_SR_R
+   61 00000032 6809            LDR              R1, [R1]
+   62 00000034 F001 0102       AND              R1, R1, #0x02
+   63 00000038 EA4F 0151       LSR              R1, R1, #1
+   64 0000003C 2900            CMP              R1, #0
+   65 0000003E D0F7            BEQ              FIFOLow     ;check bit 1 loop
+   66 00000040         
+   67 00000040 4904            LDR              R1, =GPIO_PORTA_DATA_R
+   68 00000042 680A            LDR              R2, [R1]
+   69 00000044 F042 0240       ORR              R2, #0x40   ;set DC pa6
+   70 00000048 600A            STR              R2, [R1]
+   71 0000004A         
+   72 0000004A 4903            LDR              R1, =SSI0_DR_R
+   73 0000004C 6008            STR              R0, [R1]    ;write command
+   74 0000004E         
+   75 0000004E 4770            BX               LR          ;   return
+   76 00000050         
+   77 00000050         
+   78 00000050                 ALIGN                        ; make sure the end
+                                                             of this section is
+                                                             aligned
+   79 00000050                 END                          ; end of file
+              4000800C 
+              400043FC 
+              40008008 
+Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M4 --apcs=interw
+ork --depend=.\lcd.d -o.\lcd.o -I.\RTE\_SpaceInvaders -IC:\Users\safin\AppData\
+Local\Arm\Packs\ARM\CMSIS\5.8.0\CMSIS\Core\Include -IC:\Users\safin\AppData\Loc
+al\Arm\Packs\Keil\TM4C_DFP\1.1.0\Device\Include\TM4C123 --predefine="__UVISION_
+VERSION SETA 536" --predefine="_RTE_ SETA 1" --predefine="TM4C123GH6PM SETA 1" 
+--predefine="_RTE_ SETA 1" --list=.\lcd.lst LCD.s
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Relocatable symbols
+
+.text 00000000
+
+Symbol: .text
+   Definitions
+      At line 8 in file LCD.s
+   Uses
+      None
+Comment: .text unused
+CommandHigh1 00000000
+
+Symbol: CommandHigh1
+   Definitions
+      At line 21 in file LCD.s
+   Uses
+      At line 27 in file LCD.s
+Comment: CommandHigh1 used once
+CommandHigh2 0000001E
+
+Symbol: CommandHigh2
+   Definitions
+      At line 37 in file LCD.s
+   Uses
+      At line 43 in file LCD.s
+Comment: CommandHigh2 used once
+FIFOLow 00000030
+
+Symbol: FIFOLow
+   Definitions
+      At line 59 in file LCD.s
+   Uses
+      At line 65 in file LCD.s
+Comment: FIFOLow used once
+writecommand 00000000
+
+Symbol: writecommand
+   Definitions
+      At line 12 in file LCD.s
+   Uses
+      At line 5 in file LCD.s
+Comment: writecommand used once
+writedata 00000030
+
+Symbol: writedata
+   Definitions
+      At line 52 in file LCD.s
+   Uses
+      At line 6 in file LCD.s
+Comment: writedata used once
+6 symbols
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Absolute symbols
+
+GPIO_PORTA_DATA_R 400043FC
+
+Symbol: GPIO_PORTA_DATA_R
+   Definitions
+      At line 1 in file LCD.s
+   Uses
+      At line 29 in file LCD.s
+      At line 67 in file LCD.s
+
+SSI0_DR_R 40008008
+
+Symbol: SSI0_DR_R
+   Definitions
+      At line 2 in file LCD.s
+   Uses
+      At line 34 in file LCD.s
+      At line 72 in file LCD.s
+
+SSI0_SR_R 4000800C
+
+Symbol: SSI0_SR_R
+   Definitions
+      At line 3 in file LCD.s
+   Uses
+      At line 22 in file LCD.s
+      At line 38 in file LCD.s
+      At line 60 in file LCD.s
+
+3 symbols
+344 symbols in table
